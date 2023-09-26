@@ -1,5 +1,6 @@
 #  coding: utf-8 
 import socketserver
+import os
 
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
 # 
@@ -26,13 +27,53 @@ import socketserver
 
 # try: curl -v -X GET http://127.0.0.1:8080/
 
+# Resources:
+# https://www.geeksforgeeks.org/how-to-convert-bytes-to-string-in-python/
+# https://www.geeksforgeeks.org/python-check-if-a-file-or-directory-exists-2/
+# https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
 
 class MyWebServer(socketserver.BaseRequestHandler):
     
     def handle(self):
         self.data = self.request.recv(1024).strip()
+        components = self.data.decode().split()
+        request, path, version, *headers = components
+        content_type = path.split('.')[-1]
+        ver = 'HTTP/1.1'
+        folder = './www'  # only serve files from ./www
+        allowed_types = {'html', 'css'}  # supported mime-types for HTML and CSS
+
+        if version == 'HTTP/1.1' and request == 'GET':
+            if os.path.isdir(f'{folder}{path}'):  # valid directory
+                if path.endswith('/'):
+                    # return index.html from directories from paths that end in /
+                    with open(f'{folder}{path}index.html', 'r') as f:
+                        file_content = f.read()
+                    response = f'{ver} 200 OK\nContent-Type: text/html\n\n{file_content}'
+                else:
+                    response = f'{ver} 301 Moved Permanently\nLocation: {path}/\n\n'
+            elif content_type in allowed_types: 
+                # return files that are supported
+                try:
+                    with open(f'{folder}{path}', 'r') as f:
+                        file_content = f.read()
+                    response = f'{ver} 200 OK\nContent-Type: text/{content_type}\n\n{file_content}'
+                except FileNotFoundError:
+                    # 404 error for files that don't exist
+                    response = f'{ver} 404 Not Found\n\n'
+            else:
+                # 404 error for invalid directories and unsupported file types
+                response = f'{ver} 404 Not Found\n\n'
+        elif request != 'GET':
+            response = f'{ver} 405 Method Not Allowed\n\n'
+        elif version != 'HTTP/1.1':
+            response = f'{ver} 505 HTTP Version Not Supported'
+        else:
+            response = f'{ver} 400 Bad Request\n\n'
+
         print ("Got a request of: %s\n" % self.data)
-        self.request.sendall(bytearray("OK",'utf-8'))
+        self.request.sendall(response.encode())
+         
 
 if __name__ == "__main__":
     HOST, PORT = "localhost", 8080
