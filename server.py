@@ -37,7 +37,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
     def handle(self):
         self.data = self.request.recv(1024).strip()
         components = self.data.decode().split()
-        request, path, version = components[0], components[1], components[2]
+        request, path, version, *headers = components
         content_type = path.split('.')[-1]
         ver = 'HTTP/1.1'
         folder = './www'  # only serve files from ./www
